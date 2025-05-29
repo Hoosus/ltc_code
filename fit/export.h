@@ -1,6 +1,16 @@
 #ifndef _EXPORT_
 #define _EXPORT_
 
+#define TINYEXR_USE_MINIZ 0
+#define TINYEXR_USE_STB_ZLIB 1 
+#define TINYEXR_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image_write.h"
+#include "stb_image.h"
+#include "tinyexr.h"
+
 // export data to C
 void writeTabC(mat3 * tab, vec2 * tabMagFresnel, int N)
 {
@@ -100,22 +110,73 @@ void writeTabMatlab(mat3 * tab, vec2 * tabMagFresnel, int N)
 
 void writeDDS(const char* path, float* data, int N)
 {
-    int numTerms = N*N*4;
+    EXRImage image;
+    InitEXRImage(&image);
 
-    uint16_t* half = new uint16_t[numTerms];
+    image.num_channels = 4;
 
-    for (int i = 0; i < numTerms; ++i)
-        half[i] = float_to_half_fast(data[i]);
+    int width = N, height = N;
 
-    SaveDDS(path, DDS_FORMAT_R16G16B16A16_FLOAT, sizeof(uint16_t)*4, N, N, (void const*)half);
+    std::vector<float> images[4];
+    images[0].resize(width * height); // R
+    images[1].resize(width * height); // G
+    images[2].resize(width * height); // B
+    images[3].resize(width * height); // A
 
-    delete[] half;
+    // OpenEXR 要求每个通道为独立数组，按 R、G、B、A 分离
+    for (int i = 0; i < width * height; ++i) {
+        images[0][i] = data[4 * i + 0];
+        images[1][i] = data[4 * i + 1];
+        images[2][i] = data[4 * i + 2];
+        images[3][i] = data[4 * i + 3];
+    }
+
+    float* image_ptr[4];
+    image_ptr[0] = images[0].data();
+    image_ptr[1] = images[1].data();
+    image_ptr[2] = images[2].data();
+    image_ptr[3] = images[3].data();
+
+    image.images = (unsigned char**)image_ptr;
+    image.width = width;
+    image.height = height;
+
+    EXRHeader header;
+    InitEXRHeader(&header);
+
+    header.num_channels = 4;
+    header.channels = (EXRChannelInfo*)malloc(sizeof(EXRChannelInfo) * 4);
+    strncpy(header.channels[0].name, "R", 255);
+    strncpy(header.channels[1].name, "G", 255);
+    strncpy(header.channels[2].name, "B", 255);
+    strncpy(header.channels[3].name, "A", 255);
+
+    // 所有通道使用 HALF (16-bit float)
+    header.pixel_types = (int*)malloc(sizeof(int) * 4);
+    header.requested_pixel_types = (int*)malloc(sizeof(int) * 4);
+    for (int i = 0; i < 4; i++) {
+        header.pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT; // 输入数据类型
+        header.requested_pixel_types[i] = TINYEXR_PIXELTYPE_HALF; // 输出保存格式
+    }
+
+    const char* err = nullptr;
+    int ret = SaveEXRImageToFile(&image, &header, path, &err);
+    if (ret != TINYEXR_SUCCESS) {
+        std::cerr << "Failed to save EXR: " << err << std::endl;
+        FreeEXRErrorMessage(err);
+    } else {
+        std::cout << "Saved EXR" << std::endl;
+    }
+
+    free(header.channels);
+    free(header.pixel_types);
+    free(header.requested_pixel_types);
 }
 
 void writeDDS(vec4* data1, vec4* data2, int N)
 {
-    writeDDS("results/ltc_1.dds", &data1[0][0], N);
-    writeDDS("results/ltc_2.dds", &data2[0][0], N);
+    writeDDS("results/ltc_1.exr", &data1[0][0], N);
+    writeDDS("results/ltc_2.exr", &data2[0][0], N);
 }
 
 // export data to Javascript
