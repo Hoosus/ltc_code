@@ -30,13 +30,24 @@ public:
         }
 
         // D
-        // This is GGX, same as us
+        // This is GGX, but it terms out the alpha=roughness^2 here is the roughness of our implementation
+        // So we modify the alpha^2 here to single alpha
+        /*
+D = alpha^2 / (alpha^2. + (H.x^2 /H.z)^2 + (H.y/H.z)^2))
+  = alpha^2 H.z^2 / (alph^2H.z^2 + H.x^2 + H.y^2)
+  = alpha^2 H.z^2 / ((alpha^2 - 1) H.z^2 + 1)
+D^2 = alpha^4 H.z^4 / ((alpha^2 - 1) H.z^2 + 1)^2
+D^2 / (pi * alpha^2 H.z^4) = alpha^2 / pi /  (alpha^2 - 1) H.z^2 + 1) ^ 2
+        */
+
         const vec3 H = normalize(V + L);
         const float slopex = H.x/H.z;
         const float slopey = H.y/H.z;
-        float D = 1.0f / (1.0f + (slopex*slopex + slopey*slopey)/alpha/alpha);
+        // float D = 1.0f / (1.0f + (slopex*slopex + slopey*slopey)/alpha/alpha);
+        float D = 1.0f / (1.0f + (slopex*slopex + slopey*slopey)/alpha);
         D = D*D;
-        D = D/(3.14159f * alpha*alpha * H.z*H.z*H.z*H.z);
+        // D = D/(3.14159f * alpha*alpha * H.z*H.z*H.z*H.z);
+        D = D/(3.14159f * alpha * H.z*H.z*H.z*H.z);
 
         pdf = fabsf(D * H.z / 4.0f / dot(V, H));
         float res = D * G2 / 4.0f / V.z;
