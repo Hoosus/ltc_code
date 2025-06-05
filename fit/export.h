@@ -175,8 +175,8 @@ void writeDDS(const char* path, float* data, int N)
 
 void writeDDS(vec4* data1, vec4* data2, int N)
 {
-    writeDDS("results/ltc_1.exr", &data1[0][0], N);
-    writeDDS("results/ltc_2.exr", &data2[0][0], N);
+    writeDDS("results/ltc_1_oursample_and_d.exr", &data1[0][0], N);
+    writeDDS("results/ltc_2_oursample_and_d.exr", &data2[0][0], N);
 }
 
 // export data to Javascript
